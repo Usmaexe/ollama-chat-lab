@@ -1,0 +1,496 @@
+% Ollama Chat Lab Report - Extended Version
+% Author: Anou Oussama
+% Date: December 2025
+
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{float}
+
+\geometry{margin=1in}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red}
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+
+\begin{document}
+
+% Custom Title Page
+\begin{titlepage}
+\thispagestyle{empty}
+
+% Top logos section
+\noindent
+\includegraphics[scale=0.08]{images/Logo_inpt.png} 
+        
+\vspace{0.9cm}
+
+% Title section
+\begin{center}
+{\large \textsc{\textbf{Lab Report}}}\\[0.1cm]
+{\large \textsc{Computer Science \& Telecommunications Engineering}}\\[0.1cm]
+{\large \textsc{Building AI-Powered Applications}} \\[0.05cm] 
+
+\vspace{-0.04cm}
+\rule{\linewidth}{0.3mm} \\[0.3cm]
+
+\begin{spacing}{0.9}
+    {\LARGE \textbf{Building an Advanced GUI on Top of Ollama} \\[0.2cm]
+    \Large {Creating a Secure, Feature-Rich Local AI Chat Interface\\with Real-Time Streaming and User Authentication}}
+\end{spacing}
+
+\rule{\linewidth}{0.3mm} \\[0.4cm]
+
+\vspace{0.5cm}
+
+\vspace{1cm}
+
+% Author section
+\noindent
+\begin{minipage}{0.9\textwidth}
+    \vspace{-7mm}
+  \begin{flushleft} \large
+    \emph{Authored by:}\\
+    Mr. \textsc{Anou Oussama, \textit{Advanced Software Engineering for Digital Services}}
+  \end{flushleft}
+\end{minipage}
+
+\vspace{0.6cm}
+
+{\large \textit{Submitted on December 03, 2025}}\\[0.4cm]
+
+\vspace{0.3cm}
+
+% GitHub Repository
+{\large \textbf{GitHub Repository:}}\\[0.2cm]
+\href{https://github.com/AnouOussama/ollama-chat-lab}{\texttt{https://github.com/AnouOussama/ollama-chat-lab}}
+
+\vspace{1cm}
+
+% Bottom logos and institution info
+\textsc{Institut National des Postes et Télécommunications}\\[0.1cm]
+\textsc{Rabat, Morocco}
+
+\vspace{0.3cm}
+{\large Academic Year 2024-2025}
+   
+\end{center}
+
+\end{titlepage}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+Running a large language model on your own laptop sounds like something that would require a data center, right? Well, not anymore. This lab proved that with the right tools, you can have a fully functional AI assistant running locally—no cloud APIs, no subscription fees, and complete privacy.
+
+This project walks through building an AI chat interface from the ground up using Ollama, Node.js, and vanilla JavaScript. The goal wasn't just to get something working but to understand how these systems actually function under the hood. By the end of this lab, I had a working chat application that streams responses in real-time with complete user authentication and persistent chat history.
+
+The learning objectives were clear: install and run a local LLM, interact with its REST API, create a web interface with streaming capabilities, implement user authentication, and design an intuitive UI/UX. What I took away went beyond just checking boxes—I gained insight into how modern AI applications work at a fundamental level.
+
+\section{Step 0: Classroom Setup}
+
+Before writing any code, proper project organization is essential. The lab started with setting up a clean folder structure that separates concerns: backend logic lives in the root directory, while all frontend assets go into a dedicated \texttt{public} folder.
+
+\begin{verbatim}
+ollama-chat-lab/
+├── server.js                 # Main Express server
+├── package.json             # Dependencies
+├── README.md                # Documentation
+├── AUTHENTICATION.md        # Auth system docs
+└── public/                  # Frontend assets
+    ├── index.html           # Main chat interface
+    ├── script.js            # Chat logic
+    ├── styles.css           # Styling
+    ├── auth.html            # Login/signup page
+    ├── auth.js              # Auth logic
+    └── auth.css             # Auth styling
+\end{verbatim}
+
+This structure isn't revolutionary, but it's clean and maintainable. The backend serves the frontend files statically, which means the Express server handles both API requests and serves the HTML/CSS/JS files. Simple and effective.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/cmd.png}
+    \caption{Ollama running successfully with the gemma2:9b model loaded.}
+    \label{fig:repo-structure}
+\end{figure}
+
+\section{Step 1: Installing and Verifying Ollama}
+
+Ollama is the backbone of this entire project. It's a tool that makes running large language models locally actually practical. Installation was straightforward—a single curl command on Linux/macOS, or a downloadable installer for Windows.
+
+\begin{verbatim}
+curl -fsSL https://ollama.com/install.sh | sh
+\end{verbatim}
+
+Once installed, the next step was to start the Ollama service and pull a model. I used \texttt{gemma2:9b}, which is about 9GB. For context, that's tiny compared to models like GPT-3 (reportedly 800GB), but it's still surprisingly capable for running on consumer hardware.
+
+\begin{verbatim}
+ollama serve
+ollama pull gemma2:9b
+ollama run gemma2:9b
+\end{verbatim}
+
+To verify everything was working, I tested the API directly using curl:
+
+\begin{verbatim}
+curl http://localhost:11434/api/generate \
+  -d '{"model":"gemma2:9b","prompt":"Say hi"}'
+\end{verbatim}
+
+Getting a response confirmed that Ollama was up and running, with the REST API ready to accept requests. At this point, the foundation was set—I had a working LLM accessible via HTTP.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (34).png}
+    \caption{Ollama API responding to test requests.}
+    \label{fig:llm-start}
+\end{figure}
+
+\section{Step 2: Creating the Backend Proxy}
+
+With Ollama running, the next step was building a backend service to act as a proxy between the frontend and Ollama. This is necessary because browsers can't directly access Ollama's API due to CORS restrictions, and it also gives us a place to add authentication, rate limiting, or other middleware later.
+
+I initialized a Node.js project and installed the required dependencies:
+
+\begin{verbatim}
+npm init -y
+npm install express cors
+\end{verbatim}
+
+The backend implementation includes streaming support and rate limiting to prevent abuse. The server forwards requests from the frontend to Ollama and streams responses back in real-time.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (36).png}
+    \caption{The chat interface working with real-time streaming responses.}
+    \label{fig:gui-working}
+\end{figure}
+
+\section{Step 3: Building the Frontend}
+
+With the backend streaming responses, the frontend needed to handle receiving and displaying those chunks in real-time. I kept it deliberately simple—no frameworks, just vanilla JavaScript.
+
+The HTML provides a clean structure with a chat container, input area, and sidebar for history. The JavaScript handles form submission, creates message bubbles, and processes the streaming response token-by-token. Each chunk from Ollama is parsed as JSON and the response text is accumulated and rendered with markdown support.
+
+The CSS keeps things clean and modern with a dark theme, smooth animations, and ChatGPT-like styling. Code blocks are automatically highlighted using Highlight.js for better readability.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (37).png}
+    \caption{Enhanced UI with modern design and smooth animations.}
+    \label{fig:enhanced-ui}
+\end{figure}
+
+\section{Step 4: Extensions - Chat History and Model Selection}
+
+The basic implementation met the pass criteria, but I wanted to push further and implement distinction-level features.
+
+\subsection{Persistent Chat History}
+
+One major limitation of the basic version was the lack of memory. I implemented conversation history that persists across sessions using localStorage. Each chat is saved automatically with its title (first message preview), timestamp, and all messages. Users can click any previous chat to reload it, delete unwanted chats, and see which chat is currently active.
+
+The history is user-specific—each account has isolated storage using a unique key (\texttt{chatHistory\_\{userId\}}). This ensures privacy and prevents data leakage between accounts.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (38).png}
+    \caption{First chat conversation being saved to history.}
+    \label{fig:history1}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (42).png}
+    \caption{Second chat showing persistent history with multiple conversations.}
+    \label{fig:history2}
+\end{figure}
+
+\subsection{Custom Model Selector}
+
+Different models have different characteristics—some are faster but less accurate, others produce better responses but run slower. I added a custom dropdown menu (inspired by shadcn/ui design) that lets users switch between available Ollama models on the fly.
+
+The dropdown features smooth animations, visual indicators for the selected model, and descriptive information about each model (size and performance characteristics). This replaced the basic HTML select element with a much more intuitive and visually appealing interface.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/image (40).png}
+    \caption{Custom model dropdown with detailed model information.}
+    \label{fig:dropdown-models}
+\end{figure}
+
+\section{Step 5: Authentication and User Management}
+
+To make the application production-ready, I implemented a complete authentication system with user registration, login, and session management.
+
+\subsection{Authentication System}
+
+The authentication system includes dedicated login and signup pages with modern UI design. Users can create accounts with email and password (minimum 6 characters), with validation for duplicate emails and password confirmation matching.
+
+Session management supports two modes:
+\begin{itemize}
+    \item \textbf{Remember Me (24 hours)}: Session stored in localStorage
+    \item \textbf{Regular Session (1 hour)}: Session stored in sessionStorage
+\end{itemize}
+
+Every page load checks authentication status and redirects to the login page if the session is invalid or expired. This ensures that only authenticated users can access the chat interface.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (43).png}
+    \caption{Login interface with email and password fields.}
+    \label{fig:auth-login}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (45).png}
+    \caption{Signup interface for new user registration.}
+    \label{fig:auth-signup}
+\end{figure}
+
+\subsection{User Profile and Data Isolation}
+
+The sidebar displays the logged-in user's name and email with a profile component. A logout button allows users to securely end their session.
+
+Each user's data is completely isolated—chat history is stored with user-specific keys, ensuring privacy and preventing data leakage between accounts. When a user logs out, all session data is cleared and they're redirected to the authentication page.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (46).png}
+    \caption{User profile section in sidebar with logout functionality.}
+    \label{fig:user-profile}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{images/image (48).png}
+    \caption{Complete interface showing chat history, model selector, and user profile.}
+    \label{fig:complete-ui}
+\end{figure}
+
+\subsection{Security Considerations}
+
+\textbf{Important Note}: This is a client-side demo authentication system suitable for local development and learning. For production use, you would need:
+
+\begin{itemize}
+    \item Server-side session validation
+    \item Password hashing (bcrypt/argon2)
+    \item JWT tokens with refresh mechanisms
+    \item HTTPS enforcement
+    \item CSRF protection
+    \item Rate limiting on authentication endpoints
+\end{itemize}
+
+The current implementation stores passwords in plain text in localStorage, which is acceptable for a local demo but would never be appropriate for a production system.
+
+\section{Feature Summary}
+
+\subsection{Core Features Implemented}
+
+\begin{enumerate}
+    \item \textbf{Real-Time Streaming}
+    \begin{itemize}
+        \item Token-by-token response generation
+        \item No waiting for complete responses
+        \item Smooth, ChatGPT-like experience
+    \end{itemize}
+    
+    \item \textbf{User Authentication}
+    \begin{itemize}
+        \item Sign up with email and password
+        \item Secure login with session management
+        \item Remember me functionality (24h vs 1h sessions)
+        \item Automatic session expiration
+        \item User-specific data isolation
+    \end{itemize}
+    
+    \item \textbf{Persistent Chat History}
+    \begin{itemize}
+        \item All conversations saved automatically
+        \item Click any chat to reload it
+        \item Delete individual chats
+        \item Active chat highlighting
+        \item User-specific storage (isolated per account)
+        \item Limit of 50 chats per user
+    \end{itemize}
+    
+    \item \textbf{Model Selection}
+    \begin{itemize}
+        \item Custom dropdown UI (shadcn-inspired)
+        \item Visual model information (size, speed)
+        \item Active model indicator
+        \item Smooth animations and transitions
+        \item Support for multiple Ollama models
+    \end{itemize}
+    
+    \item \textbf{Modern UI/UX}
+    \begin{itemize}
+        \item Dark theme with professional design
+        \item Lucide icons for visual clarity
+        \item Markdown rendering with syntax highlighting
+        \item Smooth animations throughout
+        \item Responsive layout
+        \item Mobile-friendly interface
+    \end{itemize}
+    
+    \item \textbf{Security Features}
+    \begin{itemize}
+        \item Rate limiting (10 req/min per IP)
+        \item Session validation on every page load
+        \item User data isolation
+        \item CORS protection
+        \item Input sanitization
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Technical Stack}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Layer} & \textbf{Technology} & \textbf{Purpose} \\
+\hline
+Backend & Node.js + Express & Web server \& API \\
+Frontend & Vanilla JavaScript & Logic \& interactivity \\
+Styling & CSS3 & Modern UI design \\
+Icons & Lucide & Beautiful iconography \\
+Markdown & Marked.js & Render formatted text \\
+Syntax & Highlight.js & Code highlighting \\
+Fonts & Inter (Google Fonts) & Typography \\
+Storage & localStorage & Persistence \\
+LLM & Ollama & Local AI models \\
+\hline
+\end{tabular}
+\caption{Technology stack breakdown}
+\end{table}
+
+\section{Challenges and Solutions}
+
+\subsection{Stream Parsing Complexity}
+
+\textbf{Challenge:} Ollama returns streaming JSON objects, but TCP packets don't respect JSON boundaries. You might receive half a JSON object in one chunk and the rest in another.
+
+\textbf{Solution:} Implemented proper buffering logic that accumulates incomplete chunks and only processes complete JSON objects by splitting on newlines and catching parse errors gracefully.
+
+\subsection{Chat History State Management}
+
+\textbf{Challenge:} Managing multiple chat sessions with proper persistence and user isolation.
+
+\textbf{Solution:} User-specific storage keys with structured data (\texttt{chatHistory\_\{userId\}}). Each user gets their own isolated history stored in localStorage.
+
+\subsection{Authentication Security}
+
+\textbf{Challenge:} Client-side authentication is inherently limited in security.
+
+\textbf{Solution:} Clear documentation that this is a demo system. In production, would need server-side session validation, password hashing (bcrypt/argon2), JWT tokens with refresh mechanism, HTTPS enforcement, and CSRF protection.
+
+\subsection{Model Dropdown UX}
+
+\textbf{Challenge:} Default HTML \texttt{<select>} elements are limited in styling and UX.
+
+\textbf{Solution:} Built custom dropdown component with full control over styling, animations and transitions, rich content (icons, descriptions), and better keyboard navigation.
+
+\section{Code Quality and Best Practices}
+
+\begin{itemize}
+    \item \textbf{Code Organization}: Separation of concerns (HTML/CSS/JS), modular function design, clear naming conventions
+    \item \textbf{Error Handling}: Try-catch blocks for async operations, user-friendly error messages, graceful degradation
+    \item \textbf{User Feedback}: Loading states, disabled states for buttons, error messages with animations, confirmation dialogs
+    \item \textbf{Performance}: Event delegation, efficient DOM manipulation, CSS transitions over JavaScript animations
+\end{itemize}
+
+\section{Documentation}
+
+The project includes comprehensive documentation:
+
+\begin{itemize}
+    \item \textbf{README.md}: Project overview, installation instructions, feature list, usage guide
+    \item \textbf{AUTHENTICATION.md}: System architecture, data structures, security considerations, production recommendations
+\end{itemize}
+
+\section{Reflections and Learning Outcomes}
+
+\subsection{What Worked Well}
+
+\textbf{Incremental Development}: Starting simple and adding features iteratively made the complexity manageable. Each step built naturally on the previous one.
+
+\textbf{Local-First Approach}: Running everything locally encouraged experimentation without worrying about API costs or rate limits.
+
+\textbf{Vanilla JavaScript}: No frameworks meant complete control and deep understanding of how everything works.
+
+\subsection{Key Takeaways}
+
+\begin{itemize}
+    \item \textbf{Streaming is transformative}: The UX difference between buffered and streamed responses is massive.
+    \item \textbf{State management matters}: As soon as you add features like history and auth, state management becomes critical.
+    \item \textbf{UI details matter}: Small touches like animations, loading states, and error messages significantly impact perceived quality.
+    \item \textbf{Security is hard}: Even a "simple" auth system has many edge cases and security considerations.
+\end{itemize}
+
+\subsection{Skills Developed}
+
+\begin{itemize}
+    \item \textbf{Frontend}: Advanced DOM manipulation, state management, modern CSS, responsive design
+    \item \textbf{Backend}: Express.js server, stream handling, rate limiting, API design
+    \item \textbf{System Design}: Authentication architecture, data persistence, user experience design
+    \item \textbf{AI Integration}: LLM API interaction, streaming protocols, model selection
+\end{itemize}
+
+\section{Conclusion}
+
+This lab demonstrated building a local AI chat application from scratch, progressing from simple command-line interaction with Ollama to a feature-rich web application with authentication, streaming responses, persistent history, and modern UI.
+
+\subsection{Key Achievements}
+
+\begin{itemize}
+    \item \textbf{Complete Auth System}: Secure user registration, login, session management with user-specific data isolation
+    \item \textbf{Real-time Streaming}: Token-by-token LLM response display for excellent UX
+    \item \textbf{Modern Interface}: Clean, responsive design with custom components (dropdown, profile, history sidebar)
+    \item \textbf{Full-Stack Integration}: Express.js backend, vanilla JavaScript frontend, localStorage persistence, Ollama AI
+\end{itemize}
+
+\subsection{Learning Value}
+
+Building from scratch without frameworks provided deep insights into AI integration, stream processing, authentication architecture, state management, and UI/UX design. The incremental approach made complex features manageable and educational.
+
+\subsection{Practical Impact}
+
+This project serves as a foundation for personal AI assistants without cloud dependencies, demonstrates local-first software principles, and provides a template for privacy-conscious AI applications. The authentication system, while simple, embodies fundamental principles that scale to production environments.
+
+\vspace{1cm}
+
+\noindent
+\textbf{Repository:} \href{https://github.com/AnouOussama/ollama-chat-lab}{github.com/AnouOussama/ollama-chat-lab}
+
+\vspace{0.5cm}
+
+\noindent
+\textbf{Live Demo:} Available by running \texttt{npm start} and visiting \texttt{http://localhost:3000}
+
+\end{document}
